@@ -137,6 +137,7 @@ oxipng_GUI/
 ├── Program.cs                       Entry point; wires up the services
 ├── Forms/
 │   ├── MainForm.cs                  Main window: file list, options, output, run
+│   ├── BufferedListView.cs          Double-buffered list, so updates don't flicker
 │   └── AboutForm.cs                 Version and license texts
 ├── Models/                          Options, files, results and settings
 ├── Services/
