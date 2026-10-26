@@ -1,0 +1,81 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <OutputType>WinExe</OutputType>
+    <TargetFramework>net48</TargetFramework>
+    <LangVersion>latest</LangVersion>
+    <Nullable>enable</Nullable>
+    <UseWindowsForms>true</UseWindowsForms>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <RootNamespace>OxipngGui</RootNamespace>
+    <ApplicationIcon>Resources\oxipng_GUI.ico</ApplicationIcon>
+  </PropertyGroup>
+
+  <PropertyGroup>
+    <OxipngVersion>10.2.1</OxipngVersion>
+    <OxipngSha256>7e940f83ee46874b73f53031f96a15834cb70b220af27391fb06fe7b4dd798e1</OxipngSha256>
+    <OxipngArchiveName>oxipng-$(OxipngVersion)-x86_64-pc-windows-msvc</OxipngArchiveName>
+    <OxipngUrl>https://github.com/oxipng/oxipng/releases/download/v$(OxipngVersion)/$(OxipngArchiveName).zip</OxipngUrl>
+    <OxipngCacheDir>$([MSBuild]::NormalizeDirectory('$(MSBuildProjectDirectory)', '$(BaseIntermediateOutputPath)', 'oxipng', '$(OxipngVersion)'))</OxipngCacheDir>
+    <OxipngZip>$(OxipngCacheDir)$(OxipngArchiveName).zip</OxipngZip>
+    <OxipngUnzipDir>$(OxipngCacheDir)unzipped\</OxipngUnzipDir>
+    <OxipngExe>$(OxipngUnzipDir)$(OxipngArchiveName)\oxipng.exe</OxipngExe>
+    <OxipngLicense>$(OxipngUnzipDir)$(OxipngArchiveName)\LICENSE.txt</OxipngLicense>
+    <OxipngStamp>$(OxipngCacheDir)$(OxipngSha256).verified</OxipngStamp>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <Content Include="Resources\oxipng_GUI.ico" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <EmbeddedResource Include="$(OxipngExe)" LogicalName="OxipngGui.oxipng.exe" Visible="false" />
+    <EmbeddedResource Include="$(OxipngLicense)" LogicalName="OxipngGui.oxipng-LICENSE.txt" Visible="false" />
+    <EmbeddedResource Include="..\LICENSE.txt" LogicalName="OxipngGui.LICENSE.txt" Visible="false" />
+    <EmbeddedResource Include="..\THIRD-PARTY-NOTICES.txt" LogicalName="OxipngGui.THIRD-PARTY-NOTICES.txt" Visible="false" />
+    <AssemblyMetadata Include="OxipngVersion" Value="$(OxipngVersion)" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <Reference Include="System.Configuration" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <PackageReference Include="Costura.Fody" Version="6.2.0">
+      <PrivateAssets>all</PrivateAssets>
+    </PackageReference>
+  </ItemGroup>
+
+  <ItemGroup>
+    <Compile Update="Properties\Settings.Designer.cs">
+      <DesignTimeSharedInput>True</DesignTimeSharedInput>
+      <AutoGen>True</AutoGen>
+      <DependentUpon>Settings.settings</DependentUpon>
+    </Compile>
+  </ItemGroup>
+
+  <ItemGroup>
+    <None Update="Properties\Settings.settings">
+      <Generator>SettingsSingleFileGenerator</Generator>
+      <LastGenOutput>Settings.Designer.cs</LastGenOutput>
+    </None>
+  </ItemGroup>
+
+  <Target Name="FetchOxipng" BeforeTargets="BeforeBuild" Condition="'$(DesignTimeBuild)' != 'true' and (!Exists('$(OxipngStamp)') or !Exists('$(OxipngExe)') or !Exists('$(OxipngLicense)'))">
+    <Delete Files="$(OxipngZip).part" />
+    <DownloadFile Condition="!Exists('$(OxipngZip)')" SourceUrl="$(OxipngUrl)" DestinationFolder="$(OxipngCacheDir)" DestinationFileName="$(OxipngArchiveName).zip.part" SkipUnchangedFiles="false" Retries="2" RetryDelayMilliseconds="2000" ContinueOnError="WarnAndContinue" />
+    <Error Condition="!Exists('$(OxipngZip)') and !Exists('$(OxipngZip).part')" Text="Couldn't download $(OxipngUrl). Build once while online, or place the zip at $(OxipngZip)." />
+    <Move Condition="!Exists('$(OxipngZip)')" SourceFiles="$(OxipngZip).part" DestinationFiles="$(OxipngZip)" />
+    <GetFileHash Files="$(OxipngZip)" Algorithm="SHA256">
+      <Output TaskParameter="Hash" PropertyName="_OxipngActualSha256" />
+    </GetFileHash>
+    <Delete Condition="'$(_OxipngActualSha256)' != '$(OxipngSha256)'" Files="$(OxipngZip)" />
+    <Error Condition="'$(_OxipngActualSha256)' != '$(OxipngSha256)'" Text="SHA-256 mismatch for $(OxipngArchiveName).zip: expected $(OxipngSha256), got $(_OxipngActualSha256). The download was deleted. After a version bump, check the new hash against the release page before updating OxipngSha256." />
+    <RemoveDir Directories="$(OxipngUnzipDir)" />
+    <Unzip SourceFiles="$(OxipngZip)" DestinationFolder="$(OxipngUnzipDir)" SkipUnchangedFiles="false" />
+    <Error Condition="!Exists('$(OxipngExe)') or !Exists('$(OxipngLicense)')" Text="$(OxipngArchiveName).zip has no oxipng.exe or LICENSE.txt in its $(OxipngArchiveName) folder." />
+    <Touch Files="$(OxipngExe);$(OxipngLicense)" />
+    <Touch Files="$(OxipngStamp)" AlwaysCreate="true" />
+  </Target>
+
+</Project>
