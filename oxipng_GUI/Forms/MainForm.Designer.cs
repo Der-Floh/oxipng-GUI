@@ -387,6 +387,7 @@ sealed partial class MainForm
             //
             // MetadataComboBox
             //
+            this.MetadataComboBox.Cursor = System.Windows.Forms.Cursors.Hand;
             this.MetadataComboBox.DropDownStyle = System.Windows.Forms.ComboBoxStyle.DropDownList;
             this.MetadataComboBox.FormattingEnabled = true;
             this.MetadataComboBox.Items.AddRange(new object[] {
@@ -403,6 +404,7 @@ sealed partial class MainForm
             // ZopfliCheckBox
             //
             this.ZopfliCheckBox.AutoSize = true;
+            this.ZopfliCheckBox.Cursor = System.Windows.Forms.Cursors.Hand;
             this.ZopfliCheckBox.Location = new System.Drawing.Point(12, 98);
             this.ZopfliCheckBox.Name = "ZopfliCheckBox";
             this.ZopfliCheckBox.Size = new System.Drawing.Size(196, 17);
@@ -415,6 +417,7 @@ sealed partial class MainForm
             // AlphaCheckBox
             //
             this.AlphaCheckBox.AutoSize = true;
+            this.AlphaCheckBox.Cursor = System.Windows.Forms.Cursors.Hand;
             this.AlphaCheckBox.Location = new System.Drawing.Point(12, 121);
             this.AlphaCheckBox.Name = "AlphaCheckBox";
             this.AlphaCheckBox.Size = new System.Drawing.Size(186, 17);
@@ -427,6 +430,7 @@ sealed partial class MainForm
             // KeepDatesCheckBox
             //
             this.KeepDatesCheckBox.AutoSize = true;
+            this.KeepDatesCheckBox.Cursor = System.Windows.Forms.Cursors.Hand;
             this.KeepDatesCheckBox.Location = new System.Drawing.Point(12, 144);
             this.KeepDatesCheckBox.Name = "KeepDatesCheckBox";
             this.KeepDatesCheckBox.Size = new System.Drawing.Size(97, 17);
@@ -456,6 +460,7 @@ sealed partial class MainForm
             //
             this.OverwriteRadioButton.AutoSize = true;
             this.OverwriteRadioButton.Checked = true;
+            this.OverwriteRadioButton.Cursor = System.Windows.Forms.Cursors.Hand;
             this.OverwriteRadioButton.Location = new System.Drawing.Point(12, 24);
             this.OverwriteRadioButton.Name = "OverwriteRadioButton";
             this.OverwriteRadioButton.Size = new System.Drawing.Size(139, 17);
@@ -469,6 +474,7 @@ sealed partial class MainForm
             // SaveToFolderRadioButton
             //
             this.SaveToFolderRadioButton.AutoSize = true;
+            this.SaveToFolderRadioButton.Cursor = System.Windows.Forms.Cursors.Hand;
             this.SaveToFolderRadioButton.Location = new System.Drawing.Point(12, 47);
             this.SaveToFolderRadioButton.Name = "SaveToFolderRadioButton";
             this.SaveToFolderRadioButton.Size = new System.Drawing.Size(95, 17);
@@ -554,6 +560,7 @@ sealed partial class MainForm
             //
             // InterlaceComboBox
             //
+            this.InterlaceComboBox.Cursor = System.Windows.Forms.Cursors.Hand;
             this.InterlaceComboBox.DropDownStyle = System.Windows.Forms.ComboBoxStyle.DropDownList;
             this.InterlaceComboBox.FormattingEnabled = true;
             this.InterlaceComboBox.Items.AddRange(new object[] {
@@ -602,6 +609,7 @@ sealed partial class MainForm
             // FixChecksumsCheckBox
             //
             this.FixChecksumsCheckBox.AutoSize = true;
+            this.FixChecksumsCheckBox.Cursor = System.Windows.Forms.Cursors.Hand;
             this.FixChecksumsCheckBox.Location = new System.Drawing.Point(12, 52);
             this.FixChecksumsCheckBox.Name = "FixChecksumsCheckBox";
             this.FixChecksumsCheckBox.Size = new System.Drawing.Size(170, 17);
@@ -614,6 +622,7 @@ sealed partial class MainForm
             // ReduceTo8BitCheckBox
             //
             this.ReduceTo8BitCheckBox.AutoSize = true;
+            this.ReduceTo8BitCheckBox.Cursor = System.Windows.Forms.Cursors.Hand;
             this.ReduceTo8BitCheckBox.Location = new System.Drawing.Point(265, 52);
             this.ReduceTo8BitCheckBox.Name = "ReduceTo8BitCheckBox";
             this.ReduceTo8BitCheckBox.Size = new System.Drawing.Size(178, 17);
