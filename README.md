@@ -125,6 +125,7 @@ Change `OxipngVersion` and `OxipngSha256` in `oxipng_GUI/oxipng_GUI.csproj` and 
 | Language | C# 14 (`LangVersion` latest, nullable reference types) |
 | Framework | .NET Framework 4.8, Windows Forms |
 | Optimizer | [oxipng](https://github.com/oxipng/oxipng) 10.2.1, official Windows x64 build, embedded |
+| Folder picker | [Ookii.Dialogs.WinForms](https://github.com/ookii-dialogs/ookii-dialogs-winforms) 4.0.0 |
 | Packaging | [Costura.Fody](https://github.com/Fody/Costura) 6.2.0 |
 | Native APIs | Job objects (kernel32), `StrCmpLogicalW` (shlwapi) |
 
@@ -132,7 +133,7 @@ Change `OxipngVersion` and `OxipngSha256` in `oxipng_GUI/oxipng_GUI.csproj` and 
 
 ```text
 oxipng_GUI.slnx                      Solution
-THIRD-PARTY-NOTICES.txt              Licenses of the code inside oxipng.exe
+THIRD-PARTY-NOTICES.txt              Licenses of the bundled libraries and of the code inside oxipng.exe
 oxipng_GUI/
 ├── Program.cs                       Entry point; wires up the services
 ├── Forms/
@@ -197,6 +198,7 @@ The app removes its temp files itself. If the PC lost power or the app was kille
 
 - [oxipng](https://github.com/oxipng/oxipng) (MIT) by Joshua Holmer and contributors does all the optimizing. Its official Windows build is embedded in the app. `THIRD-PARTY-NOTICES.txt` lists the libraries inside it.
 - The app icon is the avatar of the [oxipng GitHub organization](https://github.com/oxipng).
+- [Ookii.Dialogs.WinForms](https://github.com/ookii-dialogs/ookii-dialogs-winforms) (BSD-3-Clause) provides the modern folder picker.
 - [Costura.Fody](https://github.com/Fody/Costura) (MIT) packs dependencies into the exe.
 
 ## License

@@ -1,14 +1,17 @@
 using System.Diagnostics;
 
+using Ookii.Dialogs.WinForms;
+
 namespace OxipngGui.Utils;
 
 public static class IOHelper
 {
-    public static string? SelectFolder(string description, string? selectedPath = null)
+    public static string? SelectFolder(string title, string? selectedPath = null)
     {
-        using var dialog = new FolderBrowserDialog
+        using var dialog = new VistaFolderBrowserDialog
         {
-            Description = description
+            Description = title,
+            UseDescriptionForTitle = true,
         };
 
         if (!string.IsNullOrEmpty(selectedPath) && Directory.Exists(selectedPath))

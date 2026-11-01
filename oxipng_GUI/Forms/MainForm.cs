@@ -105,7 +105,7 @@ public sealed partial class MainForm : Form
 
     private async void AddFolderButton_Click(object sender, EventArgs e)
     {
-        var folder = IOHelper.SelectFolder("Select a folder. Its PNG files and those in all of its subfolders are added.", _lastBrowseFolder);
+        var folder = IOHelper.SelectFolder("Add a folder with PNG files (subfolders included)", _lastBrowseFolder);
         if (folder is null)
             return;
 
@@ -509,7 +509,7 @@ public sealed partial class MainForm : Form
     private bool SelectOutputFolder()
     {
         var current = OutputFolderTextBox.Text.Length > 0 ? OutputFolderTextBox.Text : _lastBrowseFolder;
-        var folder = IOHelper.SelectFolder("Select the folder for the optimized files.", current);
+        var folder = IOHelper.SelectFolder("Select the folder for the optimized files", current);
         if (folder is null)
             return false;
 
