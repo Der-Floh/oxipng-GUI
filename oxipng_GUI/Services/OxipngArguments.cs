@@ -45,14 +45,33 @@ public static class OxipngArguments
 
     public static IReadOnlyList<string> ForFile(OptimizationOptions options, int threads, string inputPath, string outputPath)
     {
-        if (threads < 1)
-            throw new ArgumentOutOfRangeException(nameof(threads), threads, "At least one thread is needed.");
         if (string.IsNullOrEmpty(inputPath))
             throw new ArgumentException("The input path must not be empty.", nameof(inputPath));
         if (string.IsNullOrEmpty(outputPath))
             throw new ArgumentException("The output path must not be empty.", nameof(outputPath));
 
-        return [.. OptionFlags(options), "--threads", Invariant(threads), "--quiet", "--json", "--out", outputPath, EscapeGlobPattern(inputPath)];
+        return [.. RunFlags(options, threads), "--out", outputPath, EscapeGlobPattern(inputPath)];
+    }
+
+    /// <summary>The arguments for one oxipng run that writes each input's result into <paramref name="outputFolder"/>.</summary>
+    public static IReadOnlyList<string> ForFiles(OptimizationOptions options, int threads, IReadOnlyList<string> inputPaths, string outputFolder)
+    {
+        if (inputPaths is null)
+            throw new ArgumentNullException(nameof(inputPaths));
+        if (inputPaths.Count == 0 || inputPaths.Any(string.IsNullOrEmpty))
+            throw new ArgumentException("At least one input path is needed, and none may be empty.", nameof(inputPaths));
+        if (string.IsNullOrEmpty(outputFolder))
+            throw new ArgumentException("The output folder must not be empty.", nameof(outputFolder));
+
+        return [.. RunFlags(options, threads), "--dir", outputFolder, .. inputPaths.Select(EscapeGlobPattern)];
+    }
+
+    private static IReadOnlyList<string> RunFlags(OptimizationOptions options, int threads)
+    {
+        if (threads < 1)
+            throw new ArgumentOutOfRangeException(nameof(threads), threads, "At least one thread is needed.");
+
+        return [.. OptionFlags(options), "--threads", Invariant(threads), "--quiet", "--json"];
     }
 
     private static string StripValue(MetadataMode mode) => mode switch

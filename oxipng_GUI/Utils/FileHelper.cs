@@ -24,4 +24,14 @@ public static class FileHelper
         catch (IOException) { }
         catch (UnauthorizedAccessException) { }
     }
+
+    public static void TryDeleteEmptyDirectory(string path)
+    {
+        try
+        {
+            Directory.Delete(path, recursive: false);
+        }
+        catch (IOException) { }
+        catch (UnauthorizedAccessException) { }
+    }
 }

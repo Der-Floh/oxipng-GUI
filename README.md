@@ -20,7 +20,7 @@ oxipng itself is a command-line program. oxipng GUI puts it behind a window you 
 - The common oxipng options are a click away: optimization level, metadata, Zopfli, transparent pixels and file dates. Rarer ones sit in a collapsible **Advanced options** group.
 - The defaults are the same as running `oxipng` on the command line.
 - Takes oxipng's command-line options, so a shortcut or script can open the window with files and options already set, or start optimizing right away.
-- Optimizes several files at once and uses every CPU core.
+- Optimizes several files at once and uses every CPU core. Small files share oxipng runs, so folders with thousands of small images don't spend their time starting oxipng.
 - Shows each file's size before and after and how much was saved. Files that fail show oxipng's reason.
 - **STOP** works at any time. Files that aren't finished stay exactly as they were.
 - Remembers your settings.
@@ -102,17 +102,17 @@ At runtime, `EmbeddedOxipngBinary` unpacks `oxipng.exe` to `%LOCALAPPDATA%\oxipn
 
 ### Safe writes
 
-Left alone, oxipng overwrites a file in place by truncating it and writing the new data. If it were stopped halfway, the original would be damaged. So the app never lets oxipng write an original. Each file runs roughly like this:
+Left alone, oxipng overwrites a file in place by truncating it and writing the new data. If it were stopped halfway, the original would be damaged. So the app never lets oxipng write an original. A run looks roughly like this:
 
 ```text
-oxipng --opt 2 --threads 2 --quiet --json --out "C:\Pictures\~oxipng-1a2b3c4d.tmp" "C:\Pictures\beach.png"
+oxipng --opt 2 --threads 1 --quiet --json --dir "C:\Pictures\~oxipng-1a2b3c4d" "C:\Pictures\beach.png" "C:\Pictures\logo.png"
 ```
 
-The result goes to a temp file next to the target and replaces the target with `ReplaceFile` only once it's complete and smaller. A backup of the original is kept until the swap has succeeded. Read-only files are skipped, and a file that changed on disk while it was being optimized is left alone. oxipng reports each file as JSON, which is where the error messages in the list come from.
+oxipng writes its results into a temp folder next to the target, or into a `~oxipng-xxxxxxxx.tmp` file when a file runs alone, and each result replaces its target with `ReplaceFile` only once it's complete and smaller. A backup of the original is kept until the swap has succeeded. Read-only files are skipped, and a file that changed on disk while it was being optimized is left alone. oxipng reports each file as JSON, which is where the error messages in the list come from.
 
 ### Parallel processing
 
-oxipng runs once per file, with as many files at a time as the PC has logical processors. The cores are split between them, so a single file still gets all of them. The largest files go first. Every oxipng process belongs to a Windows job object, so closing the app, or the app crashing, ends them too.
+Starting a process takes about as long as optimizing a small PNG, so oxipng runs once per large file but once per group of small files. Files of up to 256 KB share a run, up to 32 files and 1 MB in total, as long as they're on the same drive and their names differ, since one run writes all its results into one folder. As many runs go at a time as the PC has logical processors. The cores are split between them, so a single file still gets all of them. The largest files go first. Every oxipng process belongs to a Windows job object, so closing the app, or the app crashing, ends them too.
 
 ## Building from source
 
@@ -163,10 +163,11 @@ oxipng_GUI/
 ├── Models/                          Options, files, results and settings
 ├── Services/
 │   ├── BatchOptimizer.cs            Runs files in parallel and reports progress
-│   ├── OxipngOptimizer.cs           One file: temp output, checks, safe replace
+│   ├── OxipngOptimizer.cs           One oxipng run: temp folder, checks, safe replace
 │   ├── OxipngArguments.cs           Options to oxipng command-line flags
-│   ├── OxipngReport.cs              Reads oxipng's JSON result
+│   ├── OxipngReport.cs              Reads oxipng's JSON results
 │   ├── OutputPlanner.cs             Target paths and name conflicts
+│   ├── JobGrouper.cs                Puts small files into shared oxipng runs
 │   ├── EmbeddedOxipngBinary.cs      Unpacks and checks the embedded oxipng.exe
 │   ├── ProcessRunner.cs             Starts processes and stops them on cancel
 │   ├── PngFileCollector.cs          Finds PNG files in dropped files and folders
@@ -204,17 +205,18 @@ The Status column and the file's tooltip show the reason:
 - **The file is read-only.**: clear the read-only attribute in the file's properties.
 - **The file changed while it was being optimized.**: another program wrote to the file. Close it and optimize again.
 - **Another file in the list would be written to the same place.**: in *Save to folder* mode, two files you added on their own have the same name. Add their folders instead, or optimize them separately.
+- **The path is too long.**: Windows allows paths of up to 260 characters, and the app needs room for a temp file next to the file. Move it to a folder with a shorter path.
 - Checksum errors: try **Fix files with bad checksums** under **Advanced options**.
 
-### Leftover `~oxipng-*.tmp` files
+### Leftover `~oxipng-*` folders and files
 
-The app removes its temp files itself. If the PC lost power or the app was killed while a file was being written, a `~oxipng-xxxxxxxx.tmp` file can stay behind next to it. It's safe to delete. A `~oxipng-xxxxxxxx.tmp.bak` file holds an original from the moment it was being replaced: if the original is missing, rename the `.bak` file back to the original name.
+The app removes its temp files itself. If the PC lost power or the app was killed while files were being written, a `~oxipng-xxxxxxxx` folder or `~oxipng-xxxxxxxx.tmp` file can stay behind next to them. Both are safe to delete. A `~oxipng-xxxxxxxx.bak` file holds an original from the moment it was being replaced: if the original next to it is missing, rename the `.bak` file back to the original name.
 
 ## Limitations
 
 - Windows 10 and 11, 64-bit only, because the official oxipng Windows build is 64-bit.
 - PNG and APNG only. oxipng doesn't handle JPEG, GIF or WebP.
-- Paths longer than 260 characters aren't supported.
+- Files in folders whose path is longer than 238 characters can't be optimized, because Windows allows 260 characters and the temp file next to each file needs room too.
 - English user interface only.
 
 ## Credits

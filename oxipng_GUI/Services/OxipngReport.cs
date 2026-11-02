@@ -4,22 +4,27 @@ using System.Text;
 
 namespace OxipngGui.Services;
 
-/// <summary>The result oxipng prints for a single file with <c>--json</c>.</summary>
+/// <summary>The result oxipng prints for one file with <c>--json</c>.</summary>
 public sealed class OxipngReport
 {
     private const string SuccessStatus = "success";
 
-    private OxipngReport(bool succeeded, string? error)
+    private OxipngReport(string input, bool succeeded, string? error)
     {
+        Input = input;
         Succeeded = succeeded;
         Error = error;
     }
+
+    /// <summary>The file's path, as oxipng read it.</summary>
+    public string Input { get; }
 
     public bool Succeeded { get; }
 
     public string? Error { get; }
 
-    public static OxipngReport? Parse(string json)
+    /// <returns>The result for each file, or <see langword="null"/> if <paramref name="json"/> isn't oxipng's report.</returns>
+    public static IReadOnlyList<OxipngReport>? Parse(string json)
     {
         if (string.IsNullOrWhiteSpace(json))
             return null;
@@ -28,10 +33,7 @@ public sealed class OxipngReport
         {
             using var stream = new MemoryStream(Encoding.UTF8.GetBytes(json));
             var report = new DataContractJsonSerializer(typeof(JsonReport)).ReadObject(stream) as JsonReport;
-            var result = report?.Results?.FirstOrDefault();
-            return result is null
-                ? null
-                : new OxipngReport(string.Equals(result.Status, SuccessStatus, StringComparison.Ordinal), result.Error);
+            return report?.Results?.Select(ToReport).ToList();
         }
         catch (SerializationException)
         {
@@ -39,7 +41,10 @@ public sealed class OxipngReport
         }
     }
 
-    public override string ToString() => Succeeded ? "Success" : $"Error: {Error}";
+    public override string ToString() => Succeeded ? $"{Input}: success" : $"{Input}: error {Error}";
+
+    private static OxipngReport ToReport(JsonResult result) =>
+        new(result.Input ?? string.Empty, string.Equals(result.Status, SuccessStatus, StringComparison.Ordinal), result.Error);
 
     [DataContract]
     private sealed class JsonReport
@@ -51,6 +56,9 @@ public sealed class OxipngReport
     [DataContract]
     private sealed class JsonResult
     {
+        [DataMember(Name = "input")]
+        public string? Input { get; set; }
+
         [DataMember(Name = "status")]
         public string? Status { get; set; }
 

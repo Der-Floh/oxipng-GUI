@@ -5,8 +5,9 @@ namespace OxipngGui.Services;
 public interface IPngOptimizer
 {
     /// <summary>
-    /// Optimizes one file on the calling thread. Problems with the file come back as <see cref="FileStatus.Failed"/>
-    /// and cancelling as <see cref="FileStatus.Stopped"/>; the original stays untouched in both cases.
+    /// Optimizes a group of files with one oxipng run on the calling thread and returns a result for each job, in the
+    /// group's order. Problems with a file come back as <see cref="FileStatus.Failed"/> and cancelling as
+    /// <see cref="FileStatus.Stopped"/>; the original stays untouched in both cases.
     /// </summary>
-    FileResult Optimize(PngJob job, OptimizationOptions options, int threads, CancellationToken cancellationToken = default);
+    IReadOnlyList<FileResult> Optimize(JobGroup group, OptimizationOptions options, int threads, CancellationToken cancellationToken = default);
 }
