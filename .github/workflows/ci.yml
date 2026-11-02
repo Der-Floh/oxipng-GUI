@@ -17,3 +17,10 @@ jobs:
     uses: Der-Floh/Der-Floh/.github/workflows/tool-ci.yml@v1
     with:
       project-path: oxipng_GUI/oxipng_GUI.csproj
+
+  automerge:
+    needs: ci
+    permissions:
+      contents: write
+      pull-requests: write
+    uses: Der-Floh/Der-Floh/.github/workflows/dependabot-automerge.yml@v1
