@@ -13,6 +13,7 @@ public sealed partial class MainForm : Form
     private const string OptimizeText = "OPTIMIZE";
     private const string StopText = "STOP";
     private const string GetStartedText = "Add PNG files to get started.";
+    private const string CommandLineFlagsText = "Also passed to oxipng, from the command line: ";
     private const string SignatureSeparator = "|";
     private const int MinFileColumnWidth = 150;
 
@@ -31,7 +32,7 @@ public sealed partial class MainForm : Form
     private readonly IPngFileCollector _fileCollector;
     private readonly ISettingsStore _settingsStore;
     private readonly AboutInfo _aboutInfo;
-    private readonly IReadOnlyList<string> _startupPaths;
+    private readonly LaunchRequest _launch;
     private readonly Dictionary<string, ListViewItem> _rows = new(StringComparer.OrdinalIgnoreCase);
 
     private CancellationTokenSource? _runCts;
@@ -40,16 +41,18 @@ public sealed partial class MainForm : Form
     private bool _applyingSettings = true;
     private string? _lastRunSignature;
     private string _lastBrowseFolder = string.Empty;
+    private ExtraOxipngOptions _extraOptions = ExtraOxipngOptions.None;
+    private bool _forceWrite;
     private BatchSummary _summary = BatchSummary.Empty;
     private int _runFileCount;
 
-    public MainForm(IBatchOptimizer batchOptimizer, IPngFileCollector fileCollector, ISettingsStore settingsStore, AboutInfo aboutInfo, IReadOnlyList<string> startupPaths)
+    public MainForm(IBatchOptimizer batchOptimizer, IPngFileCollector fileCollector, ISettingsStore settingsStore, AboutInfo aboutInfo, LaunchRequest launch)
     {
         _batchOptimizer = batchOptimizer ?? throw new ArgumentNullException(nameof(batchOptimizer));
         _fileCollector = fileCollector ?? throw new ArgumentNullException(nameof(fileCollector));
         _settingsStore = settingsStore ?? throw new ArgumentNullException(nameof(settingsStore));
         _aboutInfo = aboutInfo ?? throw new ArgumentNullException(nameof(aboutInfo));
-        _startupPaths = startupPaths ?? throw new ArgumentNullException(nameof(startupPaths));
+        _launch = launch ?? throw new ArgumentNullException(nameof(launch));
         InitializeComponent();
     }
 
@@ -60,7 +63,9 @@ public sealed partial class MainForm : Form
         ApplySettings(_settingsStore.Load());
         FitFileColumn();
         UpdateControls();
-        await AddPathsAsync(_startupPaths);
+        await AddPathsAsync(_launch.Paths);
+        if (_launch.OptimizeOnStart && FilesListView.Items.Count > 0)
+            await StartOptimizationAsync();
     }
 
     private async void MainForm_FormClosing(object sender, FormClosingEventArgs e)
@@ -212,8 +217,13 @@ public sealed partial class MainForm : Form
             return;
         }
 
+        await StartOptimizationAsync();
+    }
+
+    private Task StartOptimizationAsync()
+    {
         _runTask = RunOptimizationAsync();
-        await _runTask;
+        return _runTask;
     }
 
     private async Task RunOptimizationAsync()
@@ -471,11 +481,28 @@ public sealed partial class MainForm : Form
             AdvancedCheckBox.Checked = settings.ShowAdvanced;
             AdvancedGroupBox.Visible = settings.ShowAdvanced;
             _lastBrowseFolder = settings.LastBrowseFolder;
+            ApplyCommandLineOptions(options);
         }
         finally
         {
             _applyingSettings = false;
         }
+    }
+
+    /// <summary>
+    /// Keeps the oxipng options that came from the command line, shows them, and locks the controls whose own flags
+    /// would contradict them.
+    /// </summary>
+    private void ApplyCommandLineOptions(OptimizationOptions options)
+    {
+        _extraOptions = options.Extra;
+        _forceWrite = options.ForceWrite;
+        var flags = OxipngArguments.CommandLineFlags(options);
+        CommandLineLabel.Visible = flags.Count > 0;
+        CommandLineLabel.Text = CommandLineFlagsText + string.Join(" ", flags);
+        HelpToolTip.SetToolTip(CommandLineLabel, CommandLineLabel.Text);
+        MetadataComboBox.Enabled = !_extraOptions.ControlsMetadata;
+        ZopfliCheckBox.Enabled = _extraOptions.RequiredZopfli is null;
     }
 
     private UserSettings ReadSettings() => new(
@@ -488,7 +515,9 @@ public sealed partial class MainForm : Form
             interlace: (InterlaceMode)InterlaceComboBox.SelectedIndex,
             timeoutSeconds: (int)TimeoutNumericUpDown.Value,
             fixChecksums: FixChecksumsCheckBox.Checked,
-            reduceTo8Bit: ReduceTo8BitCheckBox.Checked),
+            reduceTo8Bit: ReduceTo8BitCheckBox.Checked,
+            extra: _extraOptions,
+            forceWrite: _forceWrite),
         saveToFolder: SaveToFolderRadioButton.Checked,
         outputFolder: OutputFolderTextBox.Text,
         showAdvanced: AdvancedCheckBox.Checked,

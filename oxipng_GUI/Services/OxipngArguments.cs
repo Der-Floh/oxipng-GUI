@@ -30,7 +30,17 @@ public static class OxipngArguments
         if (options.ReduceTo8Bit)
             flags.Add("--scale16");
 
+        flags.AddRange(CommandLineFlags(options));
         return flags;
+    }
+
+    /// <summary>The flags that come only from the command line, as oxipng receives them.</summary>
+    public static IReadOnlyList<string> CommandLineFlags(OptimizationOptions options)
+    {
+        if (options is null)
+            throw new ArgumentNullException(nameof(options));
+
+        return options.ForceWrite ? ["--force", .. options.Extra.Arguments] : options.Extra.Arguments;
     }
 
     public static IReadOnlyList<string> ForFile(OptimizationOptions options, int threads, string inputPath, string outputPath)

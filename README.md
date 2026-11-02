@@ -19,6 +19,7 @@ oxipng itself is a command-line program. oxipng GUI puts it behind a window you 
 - Overwrites the originals or saves optimized copies to a folder of your choice, keeping the subfolders of added folders.
 - The common oxipng options are a click away: optimization level, metadata, Zopfli, transparent pixels and file dates. Rarer ones sit in a collapsible **Advanced options** group.
 - The defaults are the same as running `oxipng` on the command line.
+- Takes oxipng's command-line options, so a shortcut or script can open the window with files and options already set, or start optimizing right away.
 - Optimizes several files at once and uses every CPU core.
 - Shows each file's size before and after and how much was saved. Files that fail show oxipng's reason.
 - **STOP** works at any time. Files that aren't finished stay exactly as they were.
@@ -74,6 +75,23 @@ Hover over an option in the app for the same explanation.
 
 The app remembers its settings and the last folders you used. They're stored per Windows user under `%LOCALAPPDATA%\oxipng_GUI\`.
 
+### Command line
+
+`oxipng_GUI.exe` adds the PNG files and folders it's started with to the list. That's what happens when you drop files onto the exe or use a *Send to* shortcut. *Open with* works too, but Explorer starts the app once for every selected file, so to get several files into one window, drop them onto the exe or use *Send to*.
+
+It also takes oxipng's own options. They set up the window for this launch only: it starts from oxipng's defaults plus the options you pass, as if you ran oxipng with them, and nothing is saved. Without options, the window opens with your saved settings as usual. Add `--run` to start optimizing as soon as the files are listed.
+
+```powershell
+oxipng_GUI.exe -o 4 --strip safe --run "D:\Pictures"
+```
+
+- Options that have a control in the window set that control: `-o`/`--opt`, `-s`, `--strip safe` and `--strip all`, `-z`/`--zopfli`, `-a`/`--alpha`, `-p`/`--preserve`, `-i`/`--interlace`, `--timeout`, `--fix` and `--scale16`. `--dir <folder>` selects **Save to folder** with that folder.
+- The other optimization options, such as `--zc`, `-f`/`--filters`, `--fast`, `--nx`, `--keep`, `--strip` with a list of chunks, or `--force`, go to oxipng unchanged. The window lists them above **OPTIMIZE** and locks the controls they decide, for example **Metadata** for `--keep`.
+- `-r`, `-q`, `-v`, `-j`, `-t` and `--sequential` are accepted and have no effect. Folders are always searched recursively, and the app chooses the number of threads itself.
+- `--out`, `--stdout`, `--dry-run` and `-` (standard input) aren't supported, because the app reads and writes the files itself.
+
+`oxipng_GUI.exe --help` lists every option, and `--version` (`-V`) shows the app and oxipng versions. If the command line is invalid, the app says what's wrong and exits with code 2.
+
 ## How it works
 
 ### Bundled oxipng
@@ -126,6 +144,7 @@ Change `OxipngVersion` and `OxipngSha256` in `oxipng_GUI/oxipng_GUI.csproj` and 
 | Framework | .NET Framework 4.8, Windows Forms |
 | Optimizer | [oxipng](https://github.com/oxipng/oxipng) 10.2.1, official Windows x64 build, embedded |
 | Folder picker | [Ookii.Dialogs.WinForms](https://github.com/ookii-dialogs/ookii-dialogs-winforms) 4.0.0 |
+| Command line | [System.CommandLine](https://github.com/dotnet/command-line-api) 2.0.14 |
 | Packaging | [Costura.Fody](https://github.com/Fody/Costura) 6.2.0 |
 | Native APIs | Job objects (kernel32), `StrCmpLogicalW` (shlwapi) |
 
@@ -135,11 +154,12 @@ Change `OxipngVersion` and `OxipngSha256` in `oxipng_GUI/oxipng_GUI.csproj` and 
 oxipng_GUI.slnx                      Solution
 THIRD-PARTY-NOTICES.txt              Licenses of the bundled libraries and of the code inside oxipng.exe
 oxipng_GUI/
-├── Program.cs                       Entry point; wires up the services
+├── Program.cs                       Entry point; reads the command line and wires up the services
 ├── Forms/
 │   ├── MainForm.cs                  Main window: file list, options, output, run
 │   ├── BufferedListView.cs          Double-buffered list, so updates don't flicker
-│   └── AboutForm.cs                 Version and license texts
+│   ├── AboutForm.cs                 Version and license texts
+│   └── CommandLineHelpForm.cs       The --help text
 ├── Models/                          Options, files, results and settings
 ├── Services/
 │   ├── BatchOptimizer.cs            Runs files in parallel and reports progress
@@ -151,6 +171,9 @@ oxipng_GUI/
 │   ├── ProcessRunner.cs             Starts processes and stops them on cancel
 │   ├── PngFileCollector.cs          Finds PNG files in dropped files and folders
 │   ├── SettingsStore.cs             Loads and saves the user settings
+│   ├── LaunchArgumentsParser.cs     Reads the command line with System.CommandLine
+│   ├── LaunchArguments.cs           Files, options and switches from the command line
+│   ├── LaunchSettingsStore.cs       Applies command-line options without saving them
 │   └── EmbeddedResources.cs         Embedded files and build metadata
 ├── Utils/
 │   ├── KillOnCloseJob.cs            Job object that ends oxipng with the app
@@ -199,6 +222,7 @@ The app removes its temp files itself. If the PC lost power or the app was kille
 - [oxipng](https://github.com/oxipng/oxipng) (MIT) by Joshua Holmer and contributors does all the optimizing. Its official Windows build is embedded in the app. `THIRD-PARTY-NOTICES.txt` lists the libraries inside it.
 - The app icon is the avatar of the [oxipng GitHub organization](https://github.com/oxipng).
 - [Ookii.Dialogs.WinForms](https://github.com/ookii-dialogs/ookii-dialogs-winforms) (BSD-3-Clause) provides the modern folder picker.
+- [System.CommandLine](https://github.com/dotnet/command-line-api) (MIT) reads the command line.
 - [Costura.Fody](https://github.com/Fody/Costura) (MIT) packs dependencies into the exe.
 
 ## License

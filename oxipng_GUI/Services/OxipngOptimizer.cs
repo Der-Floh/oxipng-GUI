@@ -66,7 +66,7 @@ public sealed class OxipngOptimizer(IOxipngBinary oxipng, IProcessRunner process
             if (Snapshot(source) != before)
                 return FileResult.Failed(job.File, ChangedMessage);
 
-            return Commit(job, tempPath, before.Length);
+            return Commit(job, tempPath, before.Length, options.ForceWrite);
         }
         finally
         {
@@ -84,16 +84,16 @@ public sealed class OxipngOptimizer(IOxipngBinary oxipng, IProcessRunner process
             ?? throw new IOException($"oxipng stopped without a result (exit code {result.ExitCode}).");
     }
 
-    private static FileResult Commit(PngJob job, string tempPath, long originalSize)
+    private static FileResult Commit(PngJob job, string tempPath, long originalSize, bool forceWrite)
     {
         var optimizedSize = new FileInfo(tempPath).Length;
-        var isSmaller = optimizedSize < originalSize;
-        if (job.OverwritesOriginal && !isSmaller)
+        var isRewritten = optimizedSize < originalSize || forceWrite;
+        if (job.OverwritesOriginal && !isRewritten)
             return FileResult.AlreadyOptimized(job.File, originalSize);
 
         FlushToDisk(tempPath);
         ReplaceWithRetries(tempPath, job.TargetPath);
-        return isSmaller
+        return isRewritten
             ? FileResult.Optimized(job.File, originalSize, optimizedSize)
             : FileResult.AlreadyOptimized(job.File, originalSize);
     }

@@ -1,5 +1,9 @@
 namespace OxipngGui.Models;
 
+/// <param name="extra">oxipng options from the command line that have no control in the window. Never saved.</param>
+/// <param name="forceWrite">
+/// <c>--force</c> from the command line: write the result even if it isn't smaller. Never saved.
+/// </param>
 public sealed class OptimizationOptions(
     int level,
     MetadataMode metadata,
@@ -9,10 +13,13 @@ public sealed class OptimizationOptions(
     InterlaceMode interlace,
     int timeoutSeconds,
     bool fixChecksums,
-    bool reduceTo8Bit)
+    bool reduceTo8Bit,
+    ExtraOxipngOptions? extra = null,
+    bool forceWrite = false)
 {
     public const int MinLevel = 0;
     public const int MaxLevel = 6;
+    public const int DefaultLevel = 2;
     public const int MaxTimeoutSeconds = 3600;
 
     public int Level { get; } = level is >= MinLevel and <= MaxLevel
@@ -37,6 +44,10 @@ public sealed class OptimizationOptions(
 
     public bool ReduceTo8Bit { get; } = reduceTo8Bit;
 
+    public ExtraOxipngOptions Extra { get; } = extra ?? ExtraOxipngOptions.None;
+
+    public bool ForceWrite { get; } = forceWrite;
+
     public override string ToString() =>
-        $"Level {Level}, metadata {Metadata}, interlacing {Interlace}, Zopfli {UseZopfli}, alpha {OptimizeAlpha}, keep dates {KeepFileDates}, timeout {TimeoutSeconds}s, fix {FixChecksums}, 16-to-8-bit {ReduceTo8Bit}";
+        $"Level {Level}, metadata {Metadata}, interlacing {Interlace}, Zopfli {UseZopfli}, alpha {OptimizeAlpha}, keep dates {KeepFileDates}, timeout {TimeoutSeconds}s, fix {FixChecksums}, 16-to-8-bit {ReduceTo8Bit}, force {ForceWrite}, extra [{Extra}]";
 }

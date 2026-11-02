@@ -73,6 +73,7 @@ sealed partial class MainForm
             this.TimeoutUnitLabel = new System.Windows.Forms.Label();
             this.FixChecksumsCheckBox = new System.Windows.Forms.CheckBox();
             this.ReduceTo8BitCheckBox = new System.Windows.Forms.CheckBox();
+            this.CommandLineLabel = new System.Windows.Forms.Label();
             this.RunTableLayoutPanel = new System.Windows.Forms.TableLayoutPanel();
             this.OptimizeButton = new System.Windows.Forms.Button();
             this.OptimizeProgressBar = new System.Windows.Forms.ProgressBar();
@@ -315,15 +316,18 @@ sealed partial class MainForm
             this.SettingsTableLayoutPanel.Controls.Add(this.OutputGroupBox, 1, 0);
             this.SettingsTableLayoutPanel.Controls.Add(this.AdvancedCheckBox, 0, 1);
             this.SettingsTableLayoutPanel.Controls.Add(this.AdvancedGroupBox, 0, 2);
+            this.SettingsTableLayoutPanel.Controls.Add(this.CommandLineLabel, 0, 3);
             this.SettingsTableLayoutPanel.Location = new System.Drawing.Point(6, 288);
             this.SettingsTableLayoutPanel.Margin = new System.Windows.Forms.Padding(0);
             this.SettingsTableLayoutPanel.Name = "SettingsTableLayoutPanel";
-            this.SettingsTableLayoutPanel.RowCount = 3;
+            this.SettingsTableLayoutPanel.RowCount = 4;
+            this.SettingsTableLayoutPanel.RowStyles.Add(new System.Windows.Forms.RowStyle());
             this.SettingsTableLayoutPanel.RowStyles.Add(new System.Windows.Forms.RowStyle());
             this.SettingsTableLayoutPanel.RowStyles.Add(new System.Windows.Forms.RowStyle());
             this.SettingsTableLayoutPanel.RowStyles.Add(new System.Windows.Forms.RowStyle());
             this.SettingsTableLayoutPanel.SetColumnSpan(this.AdvancedCheckBox, 2);
             this.SettingsTableLayoutPanel.SetColumnSpan(this.AdvancedGroupBox, 2);
+            this.SettingsTableLayoutPanel.SetColumnSpan(this.CommandLineLabel, 2);
             this.SettingsTableLayoutPanel.Size = new System.Drawing.Size(808, 285);
             this.SettingsTableLayoutPanel.TabIndex = 2;
             //
@@ -632,6 +636,18 @@ sealed partial class MainForm
             this.ReduceTo8BitCheckBox.UseVisualStyleBackColor = true;
             this.ReduceTo8BitCheckBox.CheckedChanged += new System.EventHandler(this.Option_Changed);
             //
+            // CommandLineLabel
+            //
+            this.CommandLineLabel.Anchor = ((System.Windows.Forms.AnchorStyles)((System.Windows.Forms.AnchorStyles.Left | System.Windows.Forms.AnchorStyles.Right)));
+            this.CommandLineLabel.AutoEllipsis = true;
+            this.CommandLineLabel.Location = new System.Drawing.Point(6, 288);
+            this.CommandLineLabel.Margin = new System.Windows.Forms.Padding(6, 3, 3, 3);
+            this.CommandLineLabel.Name = "CommandLineLabel";
+            this.CommandLineLabel.Size = new System.Drawing.Size(799, 15);
+            this.CommandLineLabel.TabIndex = 4;
+            this.CommandLineLabel.Text = "Also passed to oxipng, from the command line:";
+            this.CommandLineLabel.Visible = false;
+            //
             // RunTableLayoutPanel
             //
             this.RunTableLayoutPanel.Anchor = ((System.Windows.Forms.AnchorStyles)(((System.Windows.Forms.AnchorStyles.Top | System.Windows.Forms.AnchorStyles.Left)
@@ -761,6 +777,7 @@ sealed partial class MainForm
     private System.Windows.Forms.Label TimeoutUnitLabel;
     private System.Windows.Forms.CheckBox FixChecksumsCheckBox;
     private System.Windows.Forms.CheckBox ReduceTo8BitCheckBox;
+    private System.Windows.Forms.Label CommandLineLabel;
     private System.Windows.Forms.TableLayoutPanel RunTableLayoutPanel;
     private System.Windows.Forms.Button OptimizeButton;
     private System.Windows.Forms.ProgressBar OptimizeProgressBar;

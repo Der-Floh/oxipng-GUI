@@ -9,6 +9,7 @@ Libraries embedded in oxipng_GUI.exe
   Component                                     License
   --------------------------------------------  -------------------------
   Ookii.Dialogs.WinForms (folder picker)        BSD-3-Clause
+  System.CommandLine (command-line parsing)     MIT
   System.Resources.Extensions, System.Memory,   MIT
   System.Buffers, System.Numerics.Vectors,
   System.Runtime.CompilerServices.Unsafe
@@ -71,7 +72,7 @@ OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 
 ================================================================================
-System.Resources.Extensions, System.Memory, System.Buffers, System.Numerics.Vectors, System.Runtime.CompilerServices.Unsafe - MIT License
+System.CommandLine, System.Resources.Extensions, System.Memory, System.Buffers, System.Numerics.Vectors, System.Runtime.CompilerServices.Unsafe - MIT License
 ================================================================================
 
 The MIT License (MIT)
