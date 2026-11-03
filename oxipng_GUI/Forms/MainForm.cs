@@ -296,6 +296,7 @@ public sealed partial class MainForm : Form
             ProgressTimer.Stop();
             _estimator = null;
             _runCts = null;
+            FilesListView.Invalidate();
             UpdateControls();
         }
     }
@@ -321,7 +322,6 @@ public sealed partial class MainForm : Form
             files.Add(result.File);
         }
 
-        FilesListView.Invalidate();
         return files;
     }
 
@@ -335,6 +335,7 @@ public sealed partial class MainForm : Form
         OptimizeProgressBar.Maximum = ProgressBarScale;
         OptimizeProgressBar.Value = 0;
         ProgressTimer.Start();
+        FilesListView.Invalidate();
         ShowSummary(ProgressText(), SystemColors.ControlText);
         UpdateControls();
     }
@@ -639,9 +640,9 @@ public sealed partial class MainForm : Form
         return string.Join(" ", parts);
     }
 
-    private static string StatusText(FileResult result) => result.Status switch
+    private string StatusText(FileResult result) => result.Status switch
     {
-        FileStatus.Waiting => "Waiting",
+        FileStatus.Waiting => IsRunning ? "Queued" : "Ready to optimize",
         FileStatus.Optimizing => "Optimizing...",
         FileStatus.Optimized => "Optimized",
         FileStatus.AlreadyOptimized => "Already optimized",
