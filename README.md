@@ -160,49 +160,6 @@ Change `OxipngVersion` and `OxipngSha256` in `oxipng_GUI/oxipng_GUI.csproj` and 
 | Packaging | [Costura.Fody](https://github.com/Fody/Costura) 6.2.0 |
 | Native APIs | Job objects (kernel32), `StrCmpLogicalW` (shlwapi), list view messages (user32) |
 
-### Project structure
-
-```text
-oxipng_GUI.slnx                      Solution
-THIRD-PARTY-NOTICES.txt              Licenses of the bundled libraries and of the code inside oxipng.exe
-oxipng_GUI/
-├── Program.cs                       Entry point; reads the command line and wires up the services
-├── Forms/
-│   ├── MainForm.cs                  Main window: file list, options, output, run
-│   ├── BufferedListView.cs          Flicker-free list that selects all rows at once
-│   ├── AboutForm.cs                 Version and license texts
-│   └── CommandLineHelpForm.cs       The --help text
-├── Models/                          Options, files, results and settings
-├── Services/
-│   ├── BatchOptimizer.cs            Runs files in parallel and reports progress
-│   ├── BatchEstimator.cs            Progress and time left of a batch
-│   ├── RunCostModel.cs              Learns how long an oxipng run takes
-│   ├── OxipngOptimizer.cs           One oxipng run: temp folder, checks, safe replace
-│   ├── OxipngArguments.cs           Options to oxipng command-line flags
-│   ├── OxipngReport.cs              Reads oxipng's JSON results
-│   ├── OutputPlanner.cs             Target paths and name conflicts
-│   ├── JobGrouper.cs                Puts small files into shared oxipng runs
-│   ├── EmbeddedOxipngBinary.cs      Unpacks and checks the embedded oxipng.exe
-│   ├── ProcessRunner.cs             Starts processes and stops them on cancel
-│   ├── PngFileCollector.cs          Finds PNG files in dropped files and folders
-│   ├── SettingsStore.cs             Loads and saves the user settings
-│   ├── LaunchArgumentsParser.cs     Reads the command line with System.CommandLine
-│   ├── LaunchArguments.cs           Files, options and switches from the command line
-│   ├── LaunchSettingsStore.cs       Applies command-line options without saving them
-│   └── EmbeddedResources.cs         Embedded files and build metadata
-├── Utils/
-│   ├── KillOnCloseJob.cs            Job object that ends oxipng with the app
-│   ├── CommandLine.cs               Windows command-line quoting
-│   ├── NaturalFileNameComparer.cs   Explorer-style natural sort
-│   ├── ByteSize.cs                  File sizes as text
-│   ├── DurationText.cs              Durations as text
-│   ├── ThrottledProgress.cs         Limits how often progress is reported
-│   ├── FileHelper.cs                Best-effort deletes
-│   └── IOHelper.cs                  File and folder pickers, Explorer, links
-├── Properties/Settings.settings     Remembered options and folders
-└── Resources/                       App icon
-```
-
 ## Troubleshooting
 
 ### "oxipng needs the Microsoft Visual C++ Redistributable (x64)"
