@@ -13,6 +13,16 @@
   </PropertyGroup>
 
   <PropertyGroup>
+    <Product>oxipng GUI</Product>
+    <AssemblyTitle>oxipng GUI</AssemblyTitle>
+    <Description>Makes PNG files smaller without changing a pixel: a Windows front end for oxipng.</Description>
+    <Copyright>Copyright © 2026 Der_Floh</Copyright>
+    <Version>0.0.0</Version>
+    <NeutralLanguage>en</NeutralLanguage>
+    <IncludeSourceRevisionInInformationalVersion>false</IncludeSourceRevisionInInformationalVersion>
+  </PropertyGroup>
+
+  <PropertyGroup>
     <OxipngVersion>10.2.1</OxipngVersion>
     <OxipngSha256>7e940f83ee46874b73f53031f96a15834cb70b220af27391fb06fe7b4dd798e1</OxipngSha256>
     <OxipngArchiveName>oxipng-$(OxipngVersion)-x86_64-pc-windows-msvc</OxipngArchiveName>
