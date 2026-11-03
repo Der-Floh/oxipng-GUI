@@ -79,6 +79,7 @@ sealed partial class MainForm
             this.OptimizeProgressBar = new System.Windows.Forms.ProgressBar();
             this.SummaryLabel = new System.Windows.Forms.Label();
             this.HelpToolTip = new System.Windows.Forms.ToolTip(this.components);
+            this.ProgressTimer = new System.Windows.Forms.Timer(this.components);
             this.RootTableLayoutPanel.SuspendLayout();
             this.ButtonsTableLayoutPanel.SuspendLayout();
             this.FilesPanel.SuspendLayout();
@@ -245,6 +246,10 @@ sealed partial class MainForm
             this.FilesListView.TabIndex = 0;
             this.FilesListView.UseCompatibleStateImageBehavior = false;
             this.FilesListView.View = System.Windows.Forms.View.Details;
+            this.FilesListView.VirtualMode = true;
+            this.FilesListView.RetrieveVirtualItem += new System.Windows.Forms.RetrieveVirtualItemEventHandler(this.FilesListView_RetrieveVirtualItem);
+            this.FilesListView.SearchForVirtualItem += new System.Windows.Forms.SearchForVirtualItemEventHandler(this.FilesListView_SearchForVirtualItem);
+            this.FilesListView.VirtualItemsSelectionRangeChanged += new System.Windows.Forms.ListViewVirtualItemsSelectionRangeChangedEventHandler(this.FilesListView_VirtualItemsSelectionRangeChanged);
             this.FilesListView.SelectedIndexChanged += new System.EventHandler(this.FilesListView_SelectedIndexChanged);
             this.FilesListView.DragDrop += new System.Windows.Forms.DragEventHandler(this.Files_DragDrop);
             this.FilesListView.DragEnter += new System.Windows.Forms.DragEventHandler(this.Files_DragEnter);
@@ -699,6 +704,11 @@ sealed partial class MainForm
             this.SummaryLabel.TabIndex = 4;
             this.SummaryLabel.Text = "Add PNG files to get started.";
             //
+            // ProgressTimer
+            //
+            this.ProgressTimer.Interval = 250;
+            this.ProgressTimer.Tick += new System.EventHandler(this.ProgressTimer_Tick);
+            //
             // MainForm
             //
             this.AutoScaleDimensions = new System.Drawing.SizeF(6F, 13F);
@@ -783,4 +793,5 @@ sealed partial class MainForm
     private System.Windows.Forms.ProgressBar OptimizeProgressBar;
     private System.Windows.Forms.Label SummaryLabel;
     private System.Windows.Forms.ToolTip HelpToolTip;
+    private System.Windows.Forms.Timer ProgressTimer;
 }

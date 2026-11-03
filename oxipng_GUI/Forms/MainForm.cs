@@ -1,4 +1,5 @@
 using System.ComponentModel;
+using System.Diagnostics;
 
 using OxipngGui.Models;
 using OxipngGui.Services;
@@ -13,9 +14,13 @@ public sealed partial class MainForm : Form
     private const string OptimizeText = "OPTIMIZE";
     private const string StopText = "STOP";
     private const string GetStartedText = "Add PNG files to get started.";
+    private const string SearchingText = "Looking for PNG files...";
+    private const string SearchStoppedText = "Stopped looking for PNG files. No files were added.";
     private const string CommandLineFlagsText = "Also passed to oxipng, from the command line: ";
     private const string SignatureSeparator = "|";
     private const int MinFileColumnWidth = 150;
+    private const int ProgressBarScale = 1000;
+    private static readonly TimeSpan FoundCountInterval = TimeSpan.FromMilliseconds(100);
 
     private static readonly string[] LevelDescriptions =
     [
@@ -29,13 +34,17 @@ public sealed partial class MainForm : Form
     ];
 
     private readonly IBatchOptimizer _batchOptimizer;
+    private readonly Func<IBatchEstimator> _createEstimator;
     private readonly IPngFileCollector _fileCollector;
     private readonly ISettingsStore _settingsStore;
     private readonly AboutInfo _aboutInfo;
     private readonly LaunchRequest _launch;
-    private readonly Dictionary<string, ListViewItem> _rows = new(StringComparer.OrdinalIgnoreCase);
+    private readonly ListedFiles _files = new();
+    private readonly Stopwatch _runWatch = new();
 
     private CancellationTokenSource? _runCts;
+    private CancellationTokenSource? _searchCts;
+    private IBatchEstimator? _estimator;
     private Task _runTask = Task.CompletedTask;
     private bool _closePending;
     private bool _applyingSettings = true;
@@ -45,10 +54,12 @@ public sealed partial class MainForm : Form
     private bool _forceWrite;
     private BatchSummary _summary = BatchSummary.Empty;
     private int _runFileCount;
+    private string _runTimeText = string.Empty;
 
-    public MainForm(IBatchOptimizer batchOptimizer, IPngFileCollector fileCollector, ISettingsStore settingsStore, AboutInfo aboutInfo, LaunchRequest launch)
+    public MainForm(IBatchOptimizer batchOptimizer, Func<IBatchEstimator> createEstimator, IPngFileCollector fileCollector, ISettingsStore settingsStore, AboutInfo aboutInfo, LaunchRequest launch)
     {
         _batchOptimizer = batchOptimizer ?? throw new ArgumentNullException(nameof(batchOptimizer));
+        _createEstimator = createEstimator ?? throw new ArgumentNullException(nameof(createEstimator));
         _fileCollector = fileCollector ?? throw new ArgumentNullException(nameof(fileCollector));
         _settingsStore = settingsStore ?? throw new ArgumentNullException(nameof(settingsStore));
         _aboutInfo = aboutInfo ?? throw new ArgumentNullException(nameof(aboutInfo));
@@ -56,7 +67,9 @@ public sealed partial class MainForm : Form
         InitializeComponent();
     }
 
-    private bool IsBusy => _runCts is not null;
+    private bool IsRunning => _runCts is not null;
+
+    private bool IsBusy => IsRunning || _searchCts is not null;
 
     private async void MainForm_Load(object sender, EventArgs e)
     {
@@ -64,13 +77,14 @@ public sealed partial class MainForm : Form
         FitFileColumn();
         UpdateControls();
         await AddPathsAsync(_launch.Paths);
-        if (_launch.OptimizeOnStart && FilesListView.Items.Count > 0)
+        if (_launch.OptimizeOnStart && _files.Count > 0)
             await StartOptimizationAsync();
     }
 
     private async void MainForm_FormClosing(object sender, FormClosingEventArgs e)
     {
-        if (!IsBusy)
+        _searchCts?.Cancel();
+        if (!IsRunning)
             return;
 
         e.Cancel = true;
@@ -127,8 +141,8 @@ public sealed partial class MainForm : Form
         if (IsBusy)
             return;
 
-        FilesListView.Items.Clear();
-        _rows.Clear();
+        _files.Clear();
+        ShowRows();
         ShowSummary(GetStartedText, SystemColors.ControlText);
         UpdateControls();
     }
@@ -153,7 +167,7 @@ public sealed partial class MainForm : Form
         if (e.KeyCode == Keys.Delete)
             RemoveSelectedRows();
         else if (e.Control && e.KeyCode == Keys.A)
-            SelectAllRows();
+            FilesListView.SelectAll();
         else
             return;
 
@@ -162,11 +176,21 @@ public sealed partial class MainForm : Form
 
     private void FilesListView_SelectedIndexChanged(object sender, EventArgs e) => UpdateControls();
 
+    private void FilesListView_VirtualItemsSelectionRangeChanged(object sender, ListViewVirtualItemsSelectionRangeChangedEventArgs e) => UpdateControls();
+
+    private void FilesListView_RetrieveVirtualItem(object sender, RetrieveVirtualItemEventArgs e) => e.Item = CreateRow(_files[e.ItemIndex]);
+
+    private void FilesListView_SearchForVirtualItem(object sender, SearchForVirtualItemEventArgs e)
+    {
+        if (e.IsTextSearch)
+            e.Index = _files.FindByPrefix(e.Text, e.StartIndex);
+    }
+
     private void FilesListView_Resize(object sender, EventArgs e) => FitFileColumn();
 
     private void FilesContextMenuStrip_Opening(object sender, CancelEventArgs e)
     {
-        var selectedCount = FilesListView.SelectedItems.Count;
+        var selectedCount = FilesListView.SelectedIndices.Count;
         ShowInFolderToolStripMenuItem.Enabled = selectedCount == 1;
         RemoveToolStripMenuItem.Enabled = selectedCount > 0 && !IsBusy;
         e.Cancel = selectedCount == 0;
@@ -174,8 +198,8 @@ public sealed partial class MainForm : Form
 
     private void ShowInFolderToolStripMenuItem_Click(object sender, EventArgs e)
     {
-        if (FilesListView.SelectedItems.Count == 1)
-            IOHelper.ShowInExplorer(ResultOf(FilesListView.SelectedItems[0]).File.FullPath);
+        if (FilesListView.SelectedIndices.Count == 1)
+            IOHelper.ShowInExplorer(_files[FilesListView.SelectedIndices[0]].File.FullPath);
     }
 
     private void Option_Changed(object sender, EventArgs e)
@@ -212,13 +236,15 @@ public sealed partial class MainForm : Form
     {
         if (IsBusy)
         {
-            _runCts?.Cancel();
+            (_runCts ?? _searchCts)?.Cancel();
             UpdateControls();
             return;
         }
 
         await StartOptimizationAsync();
     }
+
+    private void ProgressTimer_Tick(object sender, EventArgs e) => ShowRunProgress();
 
     private Task StartOptimizationAsync()
     {
@@ -252,10 +278,11 @@ public sealed partial class MainForm : Form
     {
         using var cts = new CancellationTokenSource();
         _runCts = cts;
-        BeginRun(files.Count);
+        var estimator = _createEstimator();
+        BeginRun(files.Count, estimator);
         try
         {
-            await _batchOptimizer.RunAsync(files, settings.Options, settings.Output, new Progress<FileResult>(ShowProgress), cts.Token);
+            await _batchOptimizer.RunAsync(files, settings.Options, settings.Output, new Progress<FileResult>(ShowProgress), estimator, cts.Token);
             ShowFinished();
             return true;
         }
@@ -266,6 +293,8 @@ public sealed partial class MainForm : Form
         }
         finally
         {
+            ProgressTimer.Stop();
+            _estimator = null;
             _runCts = null;
             UpdateControls();
         }
@@ -282,40 +311,60 @@ public sealed partial class MainForm : Form
         _lastRunSignature = signature;
 
         List<PngFile> files = [];
-        foreach (ListViewItem row in FilesListView.Items)
+        for (var index = 0; index < _files.Count; index++)
         {
-            var result = ResultOf(row);
+            var result = _files[index];
             if (result.IsFinished && !rerunAll)
                 continue;
 
-            ShowResult(row, FileResult.Waiting(result.File));
+            _files.SetWaiting(index);
             files.Add(result.File);
         }
 
+        FilesListView.Invalidate();
         return files;
     }
 
-    private void BeginRun(int fileCount)
+    private void BeginRun(int fileCount, IBatchEstimator estimator)
     {
         _summary = BatchSummary.Empty;
         _runFileCount = fileCount;
-        OptimizeProgressBar.Maximum = fileCount;
+        _estimator = estimator;
+        _runTimeText = string.Empty;
+        _runWatch.Restart();
+        OptimizeProgressBar.Maximum = ProgressBarScale;
         OptimizeProgressBar.Value = 0;
+        ProgressTimer.Start();
         ShowSummary(ProgressText(), SystemColors.ControlText);
         UpdateControls();
     }
 
     private void ShowProgress(FileResult result)
     {
-        if (!_rows.TryGetValue(result.File.FullPath, out var row))
+        if (!_files.TryUpdate(result, out var index))
             return;
 
-        ShowResult(row, result);
+        FilesListView.RedrawItems(index, index, invalidateOnly: true);
         if (result.Status is FileStatus.Optimizing or FileStatus.Stopped)
             return;
 
         _summary = _summary.Add(result);
-        OptimizeProgressBar.Value = Math.Min(OptimizeProgressBar.Maximum, _summary.Done);
+        SummaryLabel.Text = ProgressText();
+    }
+
+    /// <summary>
+    /// Moves the bar by the estimated share of the work that's done, or by the share of finished files until there's
+    /// an estimate, and never back. Until then, the summary shows the elapsed time instead of the time left.
+    /// </summary>
+    private void ShowRunProgress()
+    {
+        var estimate = _estimator?.Estimate();
+        var fraction = estimate?.CompletedFraction ?? (double)_summary.Done / _runFileCount;
+        var value = Math.Min(ProgressBarScale, (int)(fraction * ProgressBarScale));
+        OptimizeProgressBar.Value = Math.Max(OptimizeProgressBar.Value, value);
+        _runTimeText = estimate is null
+            ? $"{DurationText.Clock(_runWatch.Elapsed)} elapsed"
+            : $"{DurationText.Approximate(estimate.Remaining)} left";
         SummaryLabel.Text = ProgressText();
     }
 
@@ -349,82 +398,88 @@ public sealed partial class MainForm : Form
         if (paths.Count == 0 || IsBusy)
             return;
 
-        ShowSummary("Looking for PNG files...", SystemColors.ControlText);
-        var collected = await Task.Run(() => _fileCollector.Collect(paths));
-        var added = AddRows(collected.Files);
-        ShowSummary(AddedText(added, collected.Files.Count - added, collected.SkippedCount), SystemColors.ControlText);
+        using var cts = new CancellationTokenSource();
+        BeginSearch(cts);
+        try
+        {
+            var progress = new ThrottledProgress<int>(new Progress<int>(ShowFoundCount), FoundCountInterval);
+            var collected = await Task.Run(() => _fileCollector.Collect(paths, progress, cts.Token), cts.Token);
+            var added = AddRows(collected.Files);
+            ShowSummary(AddedText(added, collected.Files.Count - added, collected.SkippedCount), SystemColors.ControlText);
+        }
+        catch (OperationCanceledException)
+        {
+            ShowSummary(SearchStoppedText, SystemColors.ControlText);
+        }
+        finally
+        {
+            EndSearch();
+        }
+    }
+
+    private void BeginSearch(CancellationTokenSource cts)
+    {
+        _searchCts = cts;
+        OptimizeProgressBar.Style = ProgressBarStyle.Marquee;
+        ShowSummary(SearchingText, SystemColors.ControlText);
+        UpdateControls();
+    }
+
+    private void ShowFoundCount(int count) => SummaryLabel.Text = $"{SearchingText} {count:N0} found";
+
+    private void EndSearch()
+    {
+        _searchCts = null;
+        OptimizeProgressBar.Style = ProgressBarStyle.Continuous;
+        OptimizeProgressBar.Value = 0;
         UpdateControls();
     }
 
     private int AddRows(IReadOnlyList<PngFile> files)
     {
         var added = 0;
-        FilesListView.BeginUpdate();
-        try
+        foreach (var file in files)
         {
-            foreach (var file in files)
-            {
-                if (_rows.TryGetValue(file.FullPath, out var existing))
-                {
-                    ShowResult(existing, FileResult.Waiting(file));
-                    continue;
-                }
-
-                var row = new ListViewItem([file.RelativeOutputPath, string.Empty, string.Empty, string.Empty, string.Empty]);
-                ShowResult(row, FileResult.Waiting(file));
-                FilesListView.Items.Add(row);
-                _rows.Add(file.FullPath, row);
+            if (_files.Add(file))
                 added++;
-            }
-        }
-        finally
-        {
-            FilesListView.EndUpdate();
         }
 
+        ShowRows();
         return added;
     }
 
     private void RemoveSelectedRows()
     {
-        if (IsBusy || FilesListView.SelectedItems.Count == 0)
+        if (IsBusy || FilesListView.SelectedIndices.Count == 0)
             return;
 
-        FilesListView.BeginUpdate();
-        try
-        {
-            foreach (var row in FilesListView.SelectedItems.Cast<ListViewItem>().ToList())
-            {
-                _rows.Remove(ResultOf(row).File.FullPath);
-                FilesListView.Items.Remove(row);
-            }
-        }
-        finally
-        {
-            FilesListView.EndUpdate();
-        }
-
+        List<int> selected = [.. FilesListView.SelectedIndices.Cast<int>()];
+        FilesListView.DeselectAll();
+        _files.RemoveAt(selected);
+        ShowRows();
         UpdateControls();
     }
 
-    private void SelectAllRows()
+    /// <summary>The list is virtual: it asks for the rows it shows, so it only needs the count and a repaint.</summary>
+    private void ShowRows()
     {
-        FilesListView.BeginUpdate();
-        foreach (ListViewItem row in FilesListView.Items)
-            row.Selected = true;
-        FilesListView.EndUpdate();
+        FilesListView.VirtualListSize = _files.Count;
+        FilesListView.Invalidate();
     }
 
-    private void ShowResult(ListViewItem row, FileResult result)
+    private ListViewItem CreateRow(FileResult result)
     {
-        row.Tag = result;
-        row.SubItems[FileColumnHeader.Index].Text = result.File.RelativeOutputPath;
-        row.SubItems[OriginalColumnHeader.Index].Text = ByteSize.Format(result.OriginalSize);
-        row.SubItems[OptimizedColumnHeader.Index].Text = result.OptimizedSize is long optimizedSize ? ByteSize.Format(optimizedSize) : string.Empty;
-        row.SubItems[SavedColumnHeader.Index].Text = result.IsFinished ? SavedPercent(result) : string.Empty;
-        row.SubItems[StatusColumnHeader.Index].Text = StatusText(result);
-        row.ForeColor = StatusColor(result.Status);
-        row.ToolTipText = result.Error is null ? result.File.FullPath : result.File.FullPath + Environment.NewLine + result.Error;
+        var cells = new string[FilesListView.Columns.Count];
+        cells[FileColumnHeader.Index] = result.File.RelativeOutputPath;
+        cells[OriginalColumnHeader.Index] = ByteSize.Format(result.OriginalSize);
+        cells[OptimizedColumnHeader.Index] = result.OptimizedSize is long optimizedSize ? ByteSize.Format(optimizedSize) : string.Empty;
+        cells[SavedColumnHeader.Index] = result.IsFinished ? SavedPercent(result) : string.Empty;
+        cells[StatusColumnHeader.Index] = StatusText(result);
+        return new ListViewItem(cells)
+        {
+            ForeColor = StatusColor(result.Status),
+            ToolTipText = result.Error is null ? result.File.FullPath : result.File.FullPath + Environment.NewLine + result.Error,
+        };
     }
 
     private void FitFileColumn()
@@ -437,19 +492,20 @@ public sealed partial class MainForm : Form
     private void UpdateControls()
     {
         var busy = IsBusy;
-        var hasRows = FilesListView.Items.Count > 0;
+        var running = IsRunning;
+        var hasRows = _files.Count > 0;
         AddFilesButton.Enabled = !busy;
         AddFolderButton.Enabled = !busy;
-        RemoveButton.Enabled = !busy && FilesListView.SelectedItems.Count > 0;
+        RemoveButton.Enabled = !busy && FilesListView.SelectedIndices.Count > 0;
         ClearButton.Enabled = !busy && hasRows;
-        OptionsGroupBox.Enabled = !busy;
-        OutputGroupBox.Enabled = !busy;
-        AdvancedGroupBox.Enabled = !busy;
+        OptionsGroupBox.Enabled = !running;
+        OutputGroupBox.Enabled = !running;
+        AdvancedGroupBox.Enabled = !running;
         FilesListView.AllowDrop = !busy;
         DropHintLabel.AllowDrop = !busy;
         DropHintLabel.Visible = !hasRows;
         OptimizeButton.Text = busy ? StopText : OptimizeText;
-        OptimizeButton.Enabled = busy ? _runCts?.IsCancellationRequested == false : hasRows;
+        OptimizeButton.Enabled = busy ? (_runCts ?? _searchCts)?.IsCancellationRequested == false : hasRows;
     }
 
     private void ShowSummary(string text, Color color)
@@ -546,12 +602,16 @@ public sealed partial class MainForm : Form
         return true;
     }
 
-    private string ProgressText() => $"{_summary.Done} / {_runFileCount} files · {SavedText(_summary)}";
+    private string ProgressText()
+    {
+        var time = _runTimeText.Length > 0 ? $" · {_runTimeText}" : string.Empty;
+        return $"{_summary.Done:N0} / {_runFileCount:N0} files{time} · {SavedText(_summary)}";
+    }
 
     private string FinishedText()
     {
-        var failed = _summary.Failed > 0 ? $", {_summary.Failed} failed" : string.Empty;
-        return $"Done: {_summary.Optimized} optimized, {_summary.AlreadyOptimized} already optimized{failed} · {SavedText(_summary)}";
+        var failed = _summary.Failed > 0 ? $", {_summary.Failed:N0} failed" : string.Empty;
+        return $"Done: {_summary.Optimized:N0} optimized, {_summary.AlreadyOptimized:N0} already optimized{failed} · {SavedText(_summary)}";
     }
 
     private string StoppedText() => $"Stopped after {FileCount(_summary.Done)} · {SavedText(_summary)}";
@@ -559,14 +619,12 @@ public sealed partial class MainForm : Form
     private static string RunSignature(UserSettings settings) =>
         string.Join(" ", OxipngArguments.OptionFlags(settings.Options)) + SignatureSeparator + settings.Output.Folder;
 
-    private static FileResult ResultOf(ListViewItem row) => (FileResult)row.Tag;
-
     private static string SavedText(BatchSummary summary) => $"saved {ByteSize.Format(summary.SavedBytes)} ({summary.SavedRatio:P1})";
 
     private static string SavedPercent(FileResult result) =>
         result.OriginalSize == 0 ? string.Empty : ((double)result.SavedBytes / result.OriginalSize).ToString("P1");
 
-    private static string FileCount(int count) => count == 1 ? "1 file" : $"{count} files";
+    private static string FileCount(int count) => count == 1 ? "1 file" : $"{count:N0} files";
 
     private static string AddedText(int added, int alreadyListed, int skipped)
     {
@@ -576,7 +634,7 @@ public sealed partial class MainForm : Form
         if (skipped == 1)
             parts.Add("Skipped 1 item that isn't a PNG file or can't be read.");
         else if (skipped > 1)
-            parts.Add($"Skipped {skipped} items that aren't PNG files or can't be read.");
+            parts.Add($"Skipped {skipped:N0} items that aren't PNG files or can't be read.");
 
         return string.Join(" ", parts);
     }

@@ -16,7 +16,7 @@ public sealed class BatchOptimizer(IOxipngBinary oxipng, IPngOptimizer optimizer
     private readonly IOxipngBinary _oxipng = oxipng ?? throw new ArgumentNullException(nameof(oxipng));
     private readonly IPngOptimizer _optimizer = optimizer ?? throw new ArgumentNullException(nameof(optimizer));
 
-    public async Task RunAsync(IReadOnlyList<PngFile> files, OptimizationOptions options, OutputOptions output, IProgress<FileResult> progress, CancellationToken cancellationToken = default)
+    public async Task RunAsync(IReadOnlyList<PngFile> files, OptimizationOptions options, OutputOptions output, IProgress<FileResult> progress, IRunObserver? observer = null, CancellationToken cancellationToken = default)
     {
         if (options is null)
             throw new ArgumentNullException(nameof(options));
@@ -36,8 +36,9 @@ public sealed class BatchOptimizer(IOxipngBinary oxipng, IPngOptimizer optimizer
         var queue = new ConcurrentQueue<JobGroup>(groups);
         var workerCount = Math.Min(groups.Count, Environment.ProcessorCount);
         var threadsPerProcess = Math.Max(1, Environment.ProcessorCount / workerCount);
+        observer?.RunsPlanned(groups, workerCount);
         var workers = Enumerable.Range(0, workerCount).Select(_ => Task.Factory.StartNew(
-            () => Drain(queue, options, threadsPerProcess, progress, cancellationToken),
+            () => Drain(queue, options, threadsPerProcess, progress, observer, cancellationToken),
             CancellationToken.None,
             TaskCreationOptions.LongRunning,
             TaskScheduler.Default));
@@ -46,14 +47,19 @@ public sealed class BatchOptimizer(IOxipngBinary oxipng, IPngOptimizer optimizer
         cancellationToken.ThrowIfCancellationRequested();
     }
 
-    private void Drain(ConcurrentQueue<JobGroup> queue, OptimizationOptions options, int threads, IProgress<FileResult> progress, CancellationToken cancellationToken)
+    private void Drain(ConcurrentQueue<JobGroup> queue, OptimizationOptions options, int threads, IProgress<FileResult> progress, IRunObserver? observer, CancellationToken cancellationToken)
     {
         while (!cancellationToken.IsCancellationRequested && queue.TryDequeue(out var group))
         {
             foreach (var job in group.Jobs)
                 progress.Report(FileResult.Optimizing(job.File));
 
-            foreach (var result in _optimizer.Optimize(group, options, threads, cancellationToken))
+            observer?.RunStarted(group);
+            var results = _optimizer.Optimize(group, options, threads, cancellationToken);
+            if (!cancellationToken.IsCancellationRequested)
+                observer?.RunFinished(group);
+
+            foreach (var result in results)
                 progress.Report(result);
         }
     }

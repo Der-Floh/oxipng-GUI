@@ -21,6 +21,8 @@ oxipng itself is a command-line program. oxipng GUI puts it behind a window you 
 - The defaults are the same as running `oxipng` on the command line.
 - Takes oxipng's command-line options, so a shortcut or script can open the window with files and options already set, or start optimizing right away.
 - Optimizes several files at once and uses every CPU core. Small files share oxipng runs, so folders with thousands of small images don't spend their time starting oxipng.
+- Handles folders with tens of thousands of images: the window stays responsive, and while it searches a folder it shows how many PNG files it has found.
+- Shows how much of a batch is done and about how long the rest will take.
 - Shows each file's size before and after and how much was saved. Files that fail show oxipng's reason.
 - **STOP** works at any time. Files that aren't finished stay exactly as they were.
 - Remembers your settings.
@@ -42,11 +44,11 @@ The first time you optimize, the app unpacks its copy of oxipng to `%LOCALAPPDAT
 
 ### Optimizing files
 
-1. Drop PNG files or folders onto the list, or click **Add Files...** or **Add Folder...**. You can also drop files onto `oxipng_GUI.exe` itself or put a shortcut to it into your *Send to* menu.
+1. Drop PNG files or folders onto the list, or click **Add Files...** or **Add Folder...**. You can also drop files onto `oxipng_GUI.exe` itself or put a shortcut to it into your *Send to* menu. While a large folder is searched, the line at the bottom counts the PNG files found so far, and **STOP** cancels the search.
 2. Check the options. The defaults suit most files.
-3. Click **OPTIMIZE**. The list fills in as files finish, and the bar at the bottom adds everything up.
+3. Click **OPTIMIZE**. The list fills in as files finish. The bar shows how much of the work is done, and the line below it counts the finished files and, after the first few seconds, says about how long the rest will take.
 
-Hover over a file to see its full path and, if it failed, why. Right-click a file to show it in Explorer or remove it from the list, or press `Del`.
+Hover over a file to see its full path and, if it failed, why. Right-click a file to show it in Explorer or remove it from the list, or press `Del`. `Ctrl+A` selects every file, and typing the start of a name jumps to it.
 
 ### Options
 
@@ -114,6 +116,16 @@ oxipng writes its results into a temp folder next to the target, or into a `~oxi
 
 Starting a process takes about as long as optimizing a small PNG, so oxipng runs once per large file but once per group of small files. Files of up to 256 KB share a run, up to 32 files and 1 MB in total, as long as they're on the same drive and their names differ, since one run writes all its results into one folder. As many runs go at a time as the PC has logical processors. The cores are split between them, so a single file still gets all of them. The largest files go first. Every oxipng process belongs to a Windows job object, so closing the app, or the app crashing, ends them too.
 
+### Large folders
+
+The search for PNG files runs in the background and reports how many it has found ten times a second. The file list is virtual: the app keeps the results itself and the list only builds the rows on screen, so adding 50,000 files, or updating them during a run, doesn't freeze the window.
+
+### Progress and time left
+
+oxipng reports nothing while it works on a file, so the app learns from the runs that finished. It times each run and fits how long a run takes as a cost per run, per file and per megabyte, by least squares over the finished runs, weighted so the few large files at the start don't decide what the many small ones cost. That gives every file a weight: the bar moves by the share of the predicted work that's done, so a large file that takes long counts for more than a small one. The time left is the remaining work at the pace of the work done so far, which also covers how well the runs share the processors.
+
+The first estimate comes once 5 seconds have passed and as many runs have finished as go at a time, because the first runs all start together and the quick ones finish first. Until then the line shows the elapsed time. The largest files go first, so the estimate is roughest at the start, before any of the small files have finished. With Zopfli, two files of the same size can take very different times, because the work depends on the image rather than the file size, so the estimate there tends to be low.
+
 ## Building from source
 
 You need Windows and **Visual Studio 2026** with the **.NET desktop development** workload. The code uses C# 14 features, which older compilers reject. The first build needs internet access to download oxipng.
@@ -146,7 +158,7 @@ Change `OxipngVersion` and `OxipngSha256` in `oxipng_GUI/oxipng_GUI.csproj` and 
 | Folder picker | [Ookii.Dialogs.WinForms](https://github.com/ookii-dialogs/ookii-dialogs-winforms) 4.0.0 |
 | Command line | [System.CommandLine](https://github.com/dotnet/command-line-api) 2.0.14 |
 | Packaging | [Costura.Fody](https://github.com/Fody/Costura) 6.2.0 |
-| Native APIs | Job objects (kernel32), `StrCmpLogicalW` (shlwapi) |
+| Native APIs | Job objects (kernel32), `StrCmpLogicalW` (shlwapi), list view messages (user32) |
 
 ### Project structure
 
@@ -157,12 +169,14 @@ oxipng_GUI/
 ├── Program.cs                       Entry point; reads the command line and wires up the services
 ├── Forms/
 │   ├── MainForm.cs                  Main window: file list, options, output, run
-│   ├── BufferedListView.cs          Double-buffered list, so updates don't flicker
+│   ├── BufferedListView.cs          Flicker-free list that selects all rows at once
 │   ├── AboutForm.cs                 Version and license texts
 │   └── CommandLineHelpForm.cs       The --help text
 ├── Models/                          Options, files, results and settings
 ├── Services/
 │   ├── BatchOptimizer.cs            Runs files in parallel and reports progress
+│   ├── BatchEstimator.cs            Progress and time left of a batch
+│   ├── RunCostModel.cs              Learns how long an oxipng run takes
 │   ├── OxipngOptimizer.cs           One oxipng run: temp folder, checks, safe replace
 │   ├── OxipngArguments.cs           Options to oxipng command-line flags
 │   ├── OxipngReport.cs              Reads oxipng's JSON results
@@ -181,6 +195,8 @@ oxipng_GUI/
 │   ├── CommandLine.cs               Windows command-line quoting
 │   ├── NaturalFileNameComparer.cs   Explorer-style natural sort
 │   ├── ByteSize.cs                  File sizes as text
+│   ├── DurationText.cs              Durations as text
+│   ├── ThrottledProgress.cs         Limits how often progress is reported
 │   ├── FileHelper.cs                Best-effort deletes
 │   └── IOHelper.cs                  File and folder pickers, Explorer, links
 ├── Properties/Settings.settings     Remembered options and folders

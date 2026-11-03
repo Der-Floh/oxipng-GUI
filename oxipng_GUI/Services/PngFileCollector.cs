@@ -9,8 +9,9 @@ public sealed class PngFileCollector : IPngFileCollector
 {
     private static readonly string[] PngExtensions = [".png", ".apng"];
     private static readonly char[] PathSeparators = [Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar];
+    private static readonly IComparer<PngFile> NaturalPathOrder = Comparer<PngFile>.Create((a, b) => NaturalFileNameComparer.Instance.Compare(a.FullPath, b.FullPath));
 
-    public CollectedFiles Collect(IEnumerable<string> paths)
+    public CollectedFiles Collect(IEnumerable<string> paths, IProgress<int>? progress = null, CancellationToken cancellationToken = default)
     {
         if (paths is null)
             throw new ArgumentNullException(nameof(paths));
@@ -19,13 +20,21 @@ public sealed class PngFileCollector : IPngFileCollector
         var skipped = 0;
         foreach (var path in paths)
         {
+            cancellationToken.ThrowIfCancellationRequested();
             var fullPath = FullPathOrNull(path);
             if (fullPath is not null && Directory.Exists(fullPath))
-                skipped += CollectFolder(fullPath, files);
+            {
+                skipped += CollectFolder(fullPath, files, progress, cancellationToken);
+            }
             else if (fullPath is not null && IsPng(fullPath) && File.Exists(fullPath))
+            {
                 files.Add(new PngFile(fullPath, Path.GetFileName(fullPath), new FileInfo(fullPath).Length));
+                progress?.Report(files.Count);
+            }
             else
+            {
                 skipped++;
+            }
         }
 
         return new CollectedFiles(files, skipped);
@@ -35,24 +44,30 @@ public sealed class PngFileCollector : IPngFileCollector
     /// Adds every PNG below <paramref name="folder"/>, without following junctions or symbolic links.
     /// </summary>
     /// <returns>The number of subfolders that couldn't be read.</returns>
-    private static int CollectFolder(string folder, List<PngFile> files)
+    private static int CollectFolder(string folder, List<PngFile> files, IProgress<int>? progress, CancellationToken cancellationToken)
     {
         var relativeBase = RelativeBaseOf(folder);
+        var firstFound = files.Count;
         var unreadable = 0;
-        List<PngFile> found = [];
         var pending = new Stack<DirectoryInfo>();
         pending.Push(new DirectoryInfo(folder));
         while (pending.Count > 0)
         {
+            cancellationToken.ThrowIfCancellationRequested();
             var directory = pending.Pop();
             try
             {
                 foreach (var entry in directory.EnumerateFileSystemInfos())
                 {
                     if (entry is DirectoryInfo subdirectory && (subdirectory.Attributes & FileAttributes.ReparsePoint) == 0)
+                    {
                         pending.Push(subdirectory);
+                    }
                     else if (entry is FileInfo file && IsPng(file.Name))
-                        found.Add(new PngFile(file.FullName, file.FullName.Substring(relativeBase.Length), file.Length));
+                    {
+                        files.Add(new PngFile(file.FullName, file.FullName.Substring(relativeBase.Length), file.Length));
+                        progress?.Report(files.Count);
+                    }
                 }
             }
             catch (Exception ex) when (ex is IOException or UnauthorizedAccessException or SecurityException)
@@ -61,8 +76,7 @@ public sealed class PngFileCollector : IPngFileCollector
             }
         }
 
-        found.Sort((a, b) => NaturalFileNameComparer.Instance.Compare(a.FullPath, b.FullPath));
-        files.AddRange(found);
+        files.Sort(firstFound, files.Count - firstFound, NaturalPathOrder);
         return unreadable;
     }
 

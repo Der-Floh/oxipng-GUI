@@ -42,7 +42,7 @@ internal static class Program
         if (launch.OverridesSettings)
             settingsStore = new LaunchSettingsStore(settingsStore, launch);
 
-        Application.Run(new MainForm(batchOptimizer, new PngFileCollector(), settingsStore, aboutInfo, launch.Request));
+        Application.Run(new MainForm(batchOptimizer, () => new BatchEstimator(), new PngFileCollector(), settingsStore, aboutInfo, launch.Request));
         return SuccessExitCode;
     }
 
